@@ -1,0 +1,42 @@
+/* Focused two-surface workspace: robot first, camera second. */
+:root{background:#090d12;color:#f0f3f6}
+.sidebar{display:none}
+.topbar{height:56px;background:#0b1016;border-color:#232930;padding:0 30px}
+.topbar .breadcrumbs{color:#9ca9b6}.topbar .breadcrumbs strong{color:#f5f7fa}
+.main{width:100%}
+.content{max-width:1600px;padding:28px 30px 24px}
+.page-heading{margin-bottom:22px}
+.page-heading h1{font-size:38px;letter-spacing:-1.7px}
+.page-heading p{font-size:13px;color:#a4b2c0}
+.eyebrow{color:#fb945a}
+.eyebrow-line{background:#f47b32}
+.version{color:#ffa66b;border-color:#7c452d;background:#332018}
+.studio-grid{grid-template-columns:minmax(0,1.7fr) minmax(300px,.8fr);gap:14px}
+.panel{background:#111820;border-color:#2b353f;border-radius:13px}
+.panel-head{height:58px;border-color:#2b353f}
+.panel-name strong{font-size:14px}
+.panel-name small{color:#8da0ad}
+.robot-panel{order:1}.camera-panel{order:2}
+.robot-view{height:min(63vh,620px);min-height:420px;background:#0a131d}
+.camera-view{height:min(63vh,620px);min-height:420px;background:#121b25}
+.camera-placeholder{padding:15px;text-align:center}
+.camera-placeholder span{max-width:240px;line-height:1.5}
+.primary{background:#ef792f;color:#18100a}.primary:hover{background:#ffa263}
+.panel-bottom{height:55px;color:#c6d0d9}
+.robot-watermark{color:#f7a16d}
+.bottom-grid{grid-template-columns:1.1fr .9fr;margin-top:14px;gap:14px}
+.controls,.telemetry{padding:19px 22px}
+.section-head{margin-bottom:17px}
+.section-head h2 svg{color:#f48b4d}
+.gestures{margin-bottom:15px}
+.gesture{background:#1b2630;border-color:#354553;color:#c1ced8}
+.gesture.selected{background:#412819;border-color:#f28b46;color:#ffc69b}
+.gesture:hover{border-color:#ef8a4a}
+.resume-button{width:100%;justify-content:center;margin:0 0 19px}
+input[type=range],.toggle-row input{accent-color:#ed7c35}
+.bar-fill{background:linear-gradient(90deg,#bd4d21,#ffa66b)}
+.slider-line .number{color:#ffac78}
+.status-pill.success{color:#8cedc6;border-color:#2b7156}
+.footer{opacity:.8}
+@media(max-width:950px){.studio-grid{grid-template-columns:1fr 1fr}.camera-view,.robot-view{height:420px;min-height:0}.content{padding:20px}.page-heading h1{font-size:30px}}
+@media(max-width:700px){.studio-grid,.bottom-grid{grid-template-columns:1fr}.camera-panel{order:1}.robot-panel{order:2}.camera-view{height:250px}.robot-view{height:430px}.topbar{padding:0 15px}.content{padding:15px}.page-heading h1{font-size:29px}.page-heading{flex-direction:column;align-items:flex-start}}
