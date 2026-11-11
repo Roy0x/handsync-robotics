@@ -2,6 +2,8 @@ import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
 const TASK_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm';
+const local = path => `${import.meta.env.BASE_URL}mediapipe/${path}`;
+const readable = e => e?.message || e?.toString?.() || JSON.stringify(e) || 'Unknown initialization error';
 export const NEUTRAL = { curls: [0.12, 0.1, 0.1, 0.1, 0.1], grip: 0, gesture: 'OPEN', wristX: 0, wristY: 0, roll: 0, pitch: 0 };
 const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
 const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
@@ -39,10 +41,30 @@ export function calculatePose(lm) {
   };
 }
 export async function createTracker() {
-  const vision = await FilesetResolver.forVisionTasks(WASM_URL);
-  const options = {baseOptions:{modelAssetPath:TASK_URL,delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minTrackingConfidence:.55};
-  try { return await HandLandmarker.createFromOptions(vision,options); }
-  catch { return HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:TASK_URL,delegate:'CPU'}}); }
+  const failures=[];
+  const sources=[
+    {wasm:local('wasm'),model:local('hand_landmarker.task'),label:'local cached assets'},
+    {wasm:local('wasm'),model:TASK_URL,label:'local WASM + online model'},
+    {wasm:WASM_URL,model:TASK_URL,label:'online fallback'}
+  ];
+  for(const source of sources){
+    try {
+      // A missing model is a common Vite SPA 200/HTML fallback; check before passing it to MediaPipe.
+      const check=await fetch(source.model,{method:'GET',signal:AbortSignal.timeout(12000)});
+      const type=check.headers.get('content-type')||'';
+      if(!check.ok || type.includes('text/html'))throw new Error(`model URL returned HTTP ${check.status} (${type||'no content-type'})`);
+      const vision=await FilesetResolver.forVisionTasks(source.wasm);
+      for(const delegate of ['CPU','GPU']){
+        try {
+          return await HandLandmarker.createFromOptions(vision,{
+            baseOptions:{modelAssetPath:source.model,delegate},runningMode:'VIDEO',numHands:1,
+            minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5
+          });
+        }catch(e){failures.push(`${source.label} (${delegate}): ${readable(e)}`);}
+      }
+    }catch(e){failures.push(`${source.label}: ${readable(e)}`);}
+  }
+  throw new Error(`Hand model initialization failed. ${failures.join(' | ').slice(0,900)}`);
 }
 export function drawLandmarks(canvas, landmarks, video) {
   const ctx=canvas.getContext('2d');
