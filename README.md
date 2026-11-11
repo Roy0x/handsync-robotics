@@ -8,10 +8,13 @@ Requires Node.js 20.19+ (Node 24 works) and an internet connection for initial d
 
 ```bash
 npm install
+npm run prepare:model
 npm run dev
 ```
 
 Open the displayed localhost URL in Chrome or Edge, click **Enable Camera**, grant permission, then hold one hand in frame. Finger flexion updates the robot. Drag the 3D model to rotate, scroll to zoom. Use the five demo gestures without a camera.
+
+`npm install` also attempts to cache MediaPipe WASM and the hand model in `public/mediapipe/`. If an installation network error prevented model download, run `npm run prepare:model` again while online. The local model avoids relying on the runtime model CDN. After preparing, restart the Vite server.
 
 ## Live gestures (v0.2)
 
@@ -37,7 +40,7 @@ Host the generated `dist/` folder on a static HTTPS host. Browser camera permiss
 - Arm shoulder/elbow motion is an **illustrative mapping** of wrist position, not biomechanical arm tracking or inverse-kinematics teleoperation.
 - The first robot uses an industrial two-jaw gripper. Mean finger flexion closes its gripper; a separate five-finger dexterous robot is a future selectable model.
 - The camera stays visible if MediaPipe model initialization fails, and reports a separate model-loading error.
-- The model and WebAssembly are downloaded from Google Storage / jsDelivr on first load. There is no paid API and no video upload to an application server; inference runs in the browser.
+- MediaPipe WASM is copied from the installed npm package, and the model is cached from Google Storage when possible. If local assets are unavailable, runtime online fallback is attempted. There is no paid API and no video upload to an application server; inference runs in the browser.
 - If the webcam is unavailable, use demo poses. Tracking quality depends on lighting, occlusion and camera position.
 
 ## Troubleshooting
