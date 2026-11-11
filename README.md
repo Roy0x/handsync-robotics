@@ -1,6 +1,17 @@
-# HandSync — Webcam to Robot MVP
+# HandSync — Robot Playground
 
 React + Three.js + MediaPipe web prototype for tracking one hand and controlling an orange industrial-style robotic arm with a parallel-jaw gripper, based on the supplied reference image.
+
+## Studio v0.3
+
+- Full-screen-style 3D interactive industrial arm stage with improved mechanical housings, cable routing, accents and a detailed gripper
+- Dark/light studio lighting, drag-to-orbit and scroll-to-zoom
+- Live webcam preview and gesture states; pinching or making a fist closes the gripper
+- Manual control lab with base, shoulder, wrist and grip sliders
+- Three live gesture challenges with a local session score (no account/backend)
+- Adjustable smoothing and landmark visibility
+
+The 3D robot is a custom procedural illustration inspired by an industrial arm, **not** a manufacturer-certified CAD/URDF model. There is no real physical robot connection.
 
 ## Quick start
 
