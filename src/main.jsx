@@ -1,6 +1,4 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.jsx';
-import './style.css';
-import './redesign.css';
-createRoot(document.getElementById('root')).render(<App />);
+import Studio from './Studio.jsx';
+createRoot(document.getElementById('root')).render(<Studio />);
