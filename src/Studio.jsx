@@ -10,28 +10,46 @@ const challenges=[{gesture:'OPEN',title:'Release the grip',hint:'Show an open pa
 const clamp=(x,min=-1,max=1)=>Math.max(min,Math.min(max,x));
 
 export default function Studio(){
-  const video=useRef(null),overlay=useRef(null),stream=useRef(null),tracker=useRef(null),frame=useRef(0),lastFrame=useRef(-1),lastSeen=useRef(0),alive=useRef(true),modeRef=useRef('DEMO'),landmarkRef=useRef(true),smoothRef=useRef(38);
+  const video=useRef(null),overlay=useRef(null),stream=useRef(null),tracker=useRef(null),frame=useRef(0),lastFrame=useRef(-1),lastSeen=useRef(0),alive=useRef(true),modeRef=useRef('DEMO'),landmarkRef=useRef(true),smoothRef=useRef(38),startingRef=useRef(false),runRef=useRef(0);
   const [pose,setPose]=useState(NEUTRAL),[robot,setRobot]=useState('hand'),[mode,setMode]=useState('DEMO'),[camera,setCamera]=useState(false),[tracking,setTracking]=useState(false),[status,setStatus]=useState('Camera off'),[error,setError]=useState(''),[fps,setFps]=useState(0),[landmark,setLandmark]=useState(true),[mirror,setMirror]=useState(true),[smooth,setSmooth]=useState(38),[preset,setPreset]=useState('open'),[tab,setTab]=useState('control'),[challenge,setChallenge]=useState(0),[score,setScore]=useState(0),[completed,setCompleted]=useState(false),[showHelp,setShowHelp]=useState(false),[scene,setScene]=useState('dark');
   const challengeRef=useRef(0),tabRef=useRef('control'),completeRef=useRef(false),successSince=useRef(0);
   useEffect(()=>{landmarkRef.current=landmark},[landmark]);
   useEffect(()=>{smoothRef.current=smooth},[smooth]);
   useEffect(()=>{tabRef.current=tab;successSince.current=0},[tab]);
   useEffect(()=>{challengeRef.current=challenge;successSince.current=0;completeRef.current=false;setCompleted(false)},[challenge]);
-  const stop=()=>{cancelAnimationFrame(frame.current);tracker.current?.close();tracker.current=null;stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;lastFrame.current=-1;if(video.current)video.current.srcObject=null;const c=overlay.current;if(c)c.getContext('2d')?.clearRect(0,0,c.width,c.height);setCamera(false);setTracking(false);setStatus('Camera off');modeRef.current='DEMO';setMode('DEMO')};
+  const stop=()=>{runRef.current++;startingRef.current=false;cancelAnimationFrame(frame.current);tracker.current?.close();tracker.current=null;stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;lastFrame.current=-1;if(video.current){video.current.pause();video.current.srcObject=null}const c=overlay.current;if(c)c.getContext('2d')?.clearRect(0,0,c.width,c.height);setCamera(false);setTracking(false);setStatus('Camera off');modeRef.current='DEMO';setMode('DEMO')};
   useEffect(()=>()=>{alive.current=false;cancelAnimationFrame(frame.current);tracker.current?.close();stream.current?.getTracks().forEach(t=>t.stop())},[]);
   const start=async()=>{
+    if(startingRef.current||stream.current)return;
+    startingRef.current=true;
+    const run=++runRef.current;
     setError('');setStatus('Requesting camera…');
     try{
       if(!navigator.mediaDevices?.getUserMedia)throw new Error('Use localhost or an HTTPS site for webcam access.');
       const media=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:30},facingMode:'user'},audio:false});
-      if(!alive.current){media.getTracks().forEach(t=>t.stop());return}
-      stream.current=media;video.current.srcObject=media;await video.current.play();setCamera(true);setStatus('Loading hand model…');
-      try{tracker.current=await createTracker()}catch(e){setStatus('Tracking unavailable');setError(`Model failed: ${e?.message||String(e)}. Run npm run prepare:model and restart the app.`);return}
-      if(!alive.current||!stream.current)return;
+      if(!alive.current||run!==runRef.current){media.getTracks().forEach(t=>t.stop());return}
+      stream.current=media;
+      const player=video.current;
+      player.srcObject=media;
+      setCamera(true);
+      // An interrupted play promise means the stream was superseded, not that camera permission failed.
+      try{await player.play()}catch(e){
+        if(run!==runRef.current)return;
+        if(e?.name!=='AbortError')throw e;
+        await new Promise(resolve=>setTimeout(resolve,120));
+        if(run!==runRef.current)return;
+        await player.play();
+      }
+      if(run!==runRef.current)return;
+      setStatus('Loading hand model…');
+      let loaded;
+      try{loaded=await createTracker()}catch(e){if(run!==runRef.current)return;setStatus('Tracking unavailable');setError(`Model failed: ${e?.message||String(e)}. Run npm run prepare:model and restart the app.`);return}
+      if(!alive.current||run!==runRef.current||!stream.current){loaded?.close();return}
+      tracker.current=loaded;
       modeRef.current='LIVE';setMode('LIVE');setStatus('Show your hand');lastSeen.current=performance.now();
       let count=0,timer=performance.now();
       const loop=()=>{
-        if(!tracker.current||!stream.current||!video.current)return;
+        if(run!==runRef.current||!tracker.current||!stream.current||!video.current)return;
         const now=performance.now();
         if(video.current.readyState>=2&&video.current.currentTime!==lastFrame.current){
           lastFrame.current=video.current.currentTime;
@@ -50,7 +68,8 @@ export default function Studio(){
         }
         frame.current=requestAnimationFrame(loop);
       };loop();
-    }catch(e){stop();setStatus('Camera blocked');setError(e?.message||String(e))}
+    }catch(e){if(run!==runRef.current)return;stop();setStatus('Camera blocked');setError(e?.message||String(e))}
+    finally{if(run===runRef.current)startingRef.current=false}
   };
   const useGesture=name=>{setPreset(name);const g=gestures[name];modeRef.current='DEMO';setMode('DEMO');setPose(p=>({...p,gesture:name.toUpperCase(),grip:g.grip,curls:g.curls,joints:g.curls.map(c=>[c,c,c]),spread:[0,0,0,0,0]}))};
   const live=()=>{if(tracker.current){modeRef.current='LIVE';setMode('LIVE')}else if(!camera)start();else setError('Camera is running, but the tracking model has not loaded. Retry camera setup.')};
@@ -71,7 +90,7 @@ export default function Studio(){
           <div className="hs-stage-foot"><span><span className="hs-stage-pulse"/> {mode==='LIVE'?'LIVE INPUT':'MANUAL INPUT'}</span><span>3D VIEWPORT <b>·</b> ORBIT ENABLED</span></div>
         </section>
         <section className="hs-right">
-          <div className="hs-camera-card"><div className="hs-card-top"><div><Video size={17}/><strong>YOUR CAMERA</strong></div><span className={camera?'hs-cam-on':''}>{camera?'● LIVE':'● OFFLINE'}</span></div><div className="hs-video-frame"><video ref={video} autoPlay muted playsInline style={{display:camera?'block':'none',transform:mirror?'scaleX(-1)':'none'}}/><canvas ref={overlay} style={{display:camera?'block':'none',transform:mirror?'scaleX(-1)':'none'}}/>{!camera&&<div className="hs-video-empty"><div><CameraOff size={30}/></div><strong>You're offline</strong><small>Turn on your camera to mirror your movements.</small></div>}{camera&&<span className="hs-fps">{fps} FPS</span>}</div><div className="hs-camera-bottom"><span><span className={tracking?'hs-online':'hs-idle-dot'}/>{tracking?`${pose.gesture} DETECTED`:status}</span><button className={camera?'hs-cam-stop':'hs-cam-start'} onClick={camera?stop:start}>{camera?<><Pause size={15}/> Stop camera</>:<><Camera size={16}/> Enable camera</>}</button></div></div>
+          <div className="hs-camera-card"><div className="hs-card-top"><div><Video size={17}/><strong>YOUR CAMERA</strong></div><span className={camera?'hs-cam-on':''}>{camera?'● LIVE':'● OFFLINE'}</span></div><div className="hs-video-frame"><video ref={video} muted playsInline style={{display:camera?'block':'none',transform:mirror?'scaleX(-1)':'none'}}/><canvas ref={overlay} style={{display:camera?'block':'none',transform:mirror?'scaleX(-1)':'none'}}/>{!camera&&<div className="hs-video-empty"><div><CameraOff size={30}/></div><strong>You're offline</strong><small>Turn on your camera to mirror your movements.</small></div>}{camera&&<span className="hs-fps">{fps} FPS</span>}</div><div className="hs-camera-bottom"><span><span className={tracking?'hs-online':'hs-idle-dot'}/>{tracking?`${pose.gesture} DETECTED`:status}</span><button className={camera?'hs-cam-stop':'hs-cam-start'} onClick={camera?stop:start}>{camera?<><Pause size={15}/> Stop camera</>:<><Camera size={16}/> Enable camera</>}</button></div></div>
           <div className="hs-gesture-card"><div className="hs-card-top"><div><Zap size={17}/><strong>{robot==='hand'?'LIVE HAND MIRROR':'GESTURE CONTROL'}</strong></div><span>{mode==='LIVE'?'LIVE':'DEMO'}</span></div><div className="hs-gesture-primary"><div className="hs-gesture-symbol">{pose.gesture==='FIST'?'✊':pose.gesture==='PINCH'?'🤏':pose.gesture==='OPEN'?'✋':'🖐️'}</div><div><small>ESTIMATED HAND POSE</small><strong>{pose.gesture||'OPEN'}</strong><span>{mode==='LIVE'?'Webcam is driving the joint motion':'Choose a pose to try it'}</span></div></div><div className="hs-gesture-grid">{Object.entries(gestures).map(([name,g])=><button key={name} onClick={()=>useGesture(name)} className={mode==='DEMO'&&preset===name?'hs-selected':''}><span>{g.symbol}</span><strong>{name.toUpperCase()}</strong></button>)}</div>{camera&&<button className="hs-resume" onClick={live}><Play size={14}/> RESUME LIVE CONTROL</button>}</div>
           <div className="hs-hint"><Sparkles size={17}/><span><strong>Try this:</strong> {robot==='hand'?'Spread your fingers, curl one finger, or make a sign. Robot 02 mirrors the estimated finger joints.':'Pinch your thumb and index finger to close the gripper. Open your hand to release.'}</span></div>
         </section>
