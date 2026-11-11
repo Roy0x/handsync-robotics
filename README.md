@@ -13,6 +13,16 @@ React + Three.js + MediaPipe web prototype for tracking one hand and controlling
 
 The 3D robot is a custom procedural illustration inspired by an industrial arm, **not** a manufacturer-certified CAD/URDF model. There is no real physical robot connection.
 
+## Robot 02 — Dexterous Hand (v0.4)
+
+- A black five-finger robotic hand and forearm inspired by the supplied reference photo, with articulated phalanges and mechanical joints
+- Select **Dexterous Hand** from the robot picker; Robot 01 remains available
+- MediaPipe's 21 landmarks estimate three bend values per finger plus approximate spread and wrist orientation
+- Live motion drives 15 virtual finger joints, instead of only opening and closing the industrial gripper
+- Manual mode exposes individual thumb, index, middle, ring, and pinky flexion sliders
+
+**Important:** This mirrors estimated visible hand poses. It does not interpret, name, or translate sign language. A single RGB camera cannot fully reconstruct hidden finger joints or exact 3D arm geometry. The model is procedurally built to resemble the reference and is not an exact scan or CAD reconstruction.
+
 ## Quick start
 
 Requires Node.js 20.19+ (Node 24 works) and an internet connection for initial dependencies and the MediaPipe model.
