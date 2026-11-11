@@ -4,7 +4,7 @@ const TASK_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarke
 const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm';
 const local = path => `${import.meta.env.BASE_URL}mediapipe/${path}`;
 const readable = e => e?.message || e?.toString?.() || JSON.stringify(e) || 'Unknown initialization error';
-export const NEUTRAL = { curls: [0.12, 0.1, 0.1, 0.1, 0.1], grip: 0, gesture: 'OPEN', wristX: 0, wristY: 0, roll: 0, pitch: 0 };
+export const NEUTRAL = { curls: [0.12, 0.1, 0.1, 0.1, 0.1], joints: Array.from({length:5},()=>[0,0,0]),spread:[0,0,0,0,0], grip: 0, gesture: 'OPEN', wristX: 0, wristY: 0, roll: 0, pitch: 0 };
 const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
 const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const angle = (a,b,c) => {
@@ -16,6 +16,15 @@ const angle = (a,b,c) => {
 export function calculatePose(lm) {
   // Bend measured at MCP/PIP joints, not fingertip-screen distance alone.
   const chains = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+  const joints = chains.map(([a,b,c,d],i)=>{
+    const mcp=clamp((Math.PI-angle(lm[0],lm[a],lm[b]))/1.55);
+    const pip=clamp((Math.PI-angle(lm[a],lm[b],lm[c]))/1.55);
+    const dip=clamp((Math.PI-angle(lm[b],lm[c],lm[d]))/1.55);
+    return [i===0?clamp((mcp+pip)*.45):mcp,pip,dip];
+  });
+  // Relative fingertip MCP spread in image space; approximate only under hand rotation.
+  const palmAxis=Math.atan2(lm[5].y-lm[17].y,lm[5].x-lm[17].x);
+  const spread=chains.map(([a,b])=>clamp(Math.atan2(lm[b].y-lm[a].y,lm[b].x-lm[a].x)-palmAxis,-1,1));
   const curls = chains.map(([a,b,c,d], i) => {
     const pipBend = 1 - angle(lm[a],lm[b],lm[c]) / Math.PI;
     const dipBend = 1 - angle(lm[b],lm[c],lm[d]) / Math.PI;
@@ -36,7 +45,7 @@ export function calculatePose(lm) {
   const roll = clamp(Math.atan2(across.y,across.x) / 1.5, -1, 1);
   const palmLength = distance(base,middle);
   return {
-    curls, grip, gesture, wristX: clamp((.5-base.x)*2,-1,1), wristY: clamp((.55-base.y)*2,-1,1),
+    curls, joints, spread, grip, gesture, wristX: clamp((.5-base.x)*2,-1,1), wristY: clamp((.55-base.y)*2,-1,1),
     roll, pitch: clamp((middle.z-base.z)/(palmLength || .1),-1,1)
   };
 }
