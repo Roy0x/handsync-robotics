@@ -30,7 +30,7 @@ export default function App(){
       catch(modelError) {
         // Model/CDN failure must never tear down a functioning webcam stream.
         setStatus('MODEL UNAVAILABLE');
-        setError(`Camera is running, but hand tracking could not load: ${modelError.message}. Check network access to MediaPipe assets and retry.`);
+        setError(`Camera is running, but hand tracking could not load: ${modelError?.message || String(modelError) || 'Unknown model error'}. Run npm run prepare:model and retry.`);
         return;
       }
       if(!mounted.current)return;
