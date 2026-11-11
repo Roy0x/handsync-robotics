@@ -2,7 +2,7 @@ import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
 const TASK_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm';
-export const NEUTRAL = { curls: [0.12, 0.1, 0.1, 0.1, 0.1], wristX: 0, wristY: 0, roll: 0, pitch: 0 };
+export const NEUTRAL = { curls: [0.12, 0.1, 0.1, 0.1, 0.1], grip: 0, gesture: 'OPEN', wristX: 0, wristY: 0, roll: 0, pitch: 0 };
 const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
 const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
 const angle = (a,b,c) => {
@@ -21,11 +21,20 @@ export function calculatePose(lm) {
     return clamp((pipBend * .55 + dipBend * .25 + mcpBend * .20 - .06) * 1.8);
   });
   const base = lm[0], index = lm[5], pinky = lm[17], middle = lm[9];
+  // Normalize the thumb/index tip gap by palm width to remain usable at different camera distances.
+  const palmWidth = distance(lm[5], lm[17]) || .1;
+  const pinchRatio = distance(lm[4],lm[8]) / palmWidth;
+  const closedCount = curls.slice(1).filter(c=>c>.48).length;
+  const isPinch = pinchRatio < .42;
+  const isFist = closedCount >= 3;
+  const isOpen = curls.slice(1).every(c=>c<.32);
+  const gesture = isPinch ? 'PINCH' : isFist ? 'FIST' : isOpen ? 'OPEN' : 'MOVE';
+  const grip = isPinch ? 1 : isFist ? .9 : isOpen ? 0 : clamp(curls.slice(1).reduce((a,b)=>a+b,0)/4);
   const across = {x:index.x-pinky.x,y:index.y-pinky.y};
   const roll = clamp(Math.atan2(across.y,across.x) / 1.5, -1, 1);
   const palmLength = distance(base,middle);
   return {
-    curls, wristX: clamp((.5-base.x)*2,-1,1), wristY: clamp((.55-base.y)*2,-1,1),
+    curls, grip, gesture, wristX: clamp((.5-base.x)*2,-1,1), wristY: clamp((.55-base.y)*2,-1,1),
     roll, pitch: clamp((middle.z-base.z)/(palmLength || .1),-1,1)
   };
 }
