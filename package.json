@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {"dev":"vite --host 0.0.0.0", "build":"vite build", "preview":"vite preview --host 0.0.0.0"},
+  "scripts": {"postinstall":"node scripts/prepare-mediapipe.mjs", "prepare:model":"node scripts/prepare-mediapipe.mjs", "dev":"vite --host 0.0.0.0", "build":"vite build", "preview":"vite preview --host 0.0.0.0"},
   "dependencies": {"@mediapipe/tasks-vision":"^0.10.22", "@react-three/drei":"^9.122.0", "@react-three/fiber":"^8.17.10", "three":"^0.175.0", "react":"^18.3.1", "react-dom":"^18.3.1", "lucide-react":"^0.468.0"},
   "devDependencies": {"@vitejs/plugin-react":"^4.4.1", "vite":"^6.1.0"}
 }
