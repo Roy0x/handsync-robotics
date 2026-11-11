@@ -13,6 +13,16 @@ npm run dev
 
 Open the displayed localhost URL in Chrome or Edge, click **Enable Camera**, grant permission, then hold one hand in frame. Finger flexion updates the robot. Drag the 3D model to rotate, scroll to zoom. Use the five demo gestures without a camera.
 
+## Live gestures (v0.2)
+
+- **Open palm:** release the parallel gripper.
+- **Pinch thumb and index fingertips:** close the gripper.
+- **Fist:** close the gripper.
+- **Move your hand:** approximate shoulder, elbow, and base movement.
+- **Demo gestures:** temporarily switch to manual mode without stopping the camera; click **Resume Live Hand Control** to take over again.
+
+The UI shows separate states for camera feed, model loading, hand detection, and live gesture output. Camera preview stays on even if MediaPipe initialization fails.
+
 To build a static deployment:
 
 ```bash
