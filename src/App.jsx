@@ -6,7 +6,7 @@ import { calculatePose, createTracker, drawLandmarks, NEUTRAL } from './tracking
 const presets={open:[.02,.02,.02,.02,.02], fist:[1,1,1,1,1], pinch:[.8,.85,.05,.05,.05], point:[.9,.02,1,1,1], peace:[.9,.02,.02,1,1]};
 export default function App(){
   const video=useRef(null),overlay=useRef(null),stream=useRef(null),tracker=useRef(null),raf=useRef(0),lastTime=useRef(-1),lastSeen=useRef(0),mounted=useRef(true);
-  const [pose,setPose]=useState(NEUTRAL),[cameraOn,setCameraOn]=useState(false),[status,setStatus]=useState('READY'),[error,setError]=useState(''),[tracked,setTracked]=useState(false),[mode,setMode]=useState('DEMO'),[gesture,setGesture]=useState('open'),[smoothing,setSmoothing]=useState(72),[mirror,setMirror]=useState(true),[landmarks,setLandmarks]=useState(true),[fps,setFps]=useState(0);
+  const [pose,setPose]=useState(NEUTRAL),[cameraOn,setCameraOn]=useState(false),[status,setStatus]=useState('READY'),[error,setError]=useState(''),[tracked,setTracked]=useState(false),[mode,setMode]=useState('DEMO'),[gesture,setGesture]=useState('open'),[smoothing,setSmoothing]=useState(35),[mirror,setMirror]=useState(true),[landmarks,setLandmarks]=useState(true),[fps,setFps]=useState(0);
   const smoothingRef=useRef(smoothing),landmarksRef=useRef(landmarks),modeRef=useRef(mode);
   useEffect(()=>{smoothingRef.current=smoothing},[smoothing]);
   useEffect(()=>{landmarksRef.current=landmarks},[landmarks]);
@@ -47,7 +47,7 @@ export default function App(){
             if(hand){
               lastSeen.current=now;setTracked(true);setStatus('TRACKING');
               const next=calculatePose(hand);
-              setPose(prev=>{const factor=.12+(100-smoothingRef.current)/100*.75;return {...next,curls:next.curls.map((v,i)=>prev.curls[i]+(v-prev.curls[i])*factor),wristX:prev.wristX+(next.wristX-prev.wristX)*factor,wristY:prev.wristY+(next.wristY-prev.wristY)*factor,roll:prev.roll+(next.roll-prev.roll)*factor,pitch:prev.pitch+(next.pitch-prev.pitch)*factor};});
+              if(modeRef.current==='LIVE')setPose(prev=>{const factor=.12+(100-smoothingRef.current)/100*.75;return {...next,grip:prev.grip+(next.grip-prev.grip)*factor,curls:next.curls.map((v,i)=>prev.curls[i]+(v-prev.curls[i])*factor),wristX:prev.wristX+(next.wristX-prev.wristX)*factor,wristY:prev.wristY+(next.wristY-prev.wristY)*factor,roll:prev.roll+(next.roll-prev.roll)*factor,pitch:prev.pitch+(next.pitch-prev.pitch)*factor};});
             }else if(now-lastSeen.current>650){setTracked(false);setStatus('SEARCHING');}
             drawLandmarks(overlay.current,landmarksRef.current?hand:null,video.current);
           }catch(e){setError(`Tracking issue: ${e.message}`);}
@@ -58,7 +58,8 @@ export default function App(){
       };tick();
     }catch(e){stop();setStatus('ERROR');setError(e?.message||'Unable to start camera. Check browser camera permission.');}
   };
-  const selectGesture=(name)=>{if(cameraOn)stop();setGesture(name);setPose({...NEUTRAL,curls:presets[name]});setMode('DEMO');};
+  const selectGesture=(name)=>{setGesture(name);setPose({...NEUTRAL,gesture:name.toUpperCase(),grip:name==='fist'||name==='pinch'?1:name==='point'?.5:0,curls:presets[name]});modeRef.current='DEMO';setMode('DEMO');};
+  const resumeLive=()=>{modeRef.current='LIVE';setMode('LIVE');};
   const reset=()=>{setPose(NEUTRAL);setGesture('open');if(!cameraOn)setMode('DEMO');};
   return <div className="app-shell">
     <aside className="sidebar">
@@ -74,7 +75,7 @@ export default function App(){
     <main className="main">
       <header className="topbar"><div className="breadcrumbs">WORKSPACE <span>/</span> <strong>MOTION STUDIO</strong></div><div className="top-right"><span className="secure"><ShieldCheck size={14}/> LOCAL PROCESSING</span><div className="avatar">MK</div></div></header>
       <div className="content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> LIVE TELEOPERATION INTERFACE</div><h1>Motion Studio <span className="version">BETA 01</span></h1><p>Mirror your hand movements onto a virtual robotic arm in real time.</p></div><div className={'status-pill '+(tracked?'success':'')}><span className="pulse"/> {tracked?'HAND DETECTED':status}</div></div>
+        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> HANDSYNC / MOTION CONTROL</div><h1>Control the robot. <span className="version">ROBOT 01</span></h1><p>Show your hand to the camera. Pinch or make a fist to close the gripper. Open your palm to release.</p></div><div className={'status-pill '+(tracked?'success':'')}><span className="pulse"/> {tracked?'HAND DETECTED':status}</div></div>
         <div className="studio-grid">
           <section className="panel camera-panel"><div className="panel-head"><div className="panel-name"><span className="panel-icon"><Camera size={16}/></span><div><strong>Camera Feed</strong><small>INPUT / HAND TRACKING</small></div></div><span className="panel-tag">CAM 01</span></div>
             <div className="camera-view">
@@ -84,17 +85,18 @@ export default function App(){
               {cameraOn&&<><span className="cam-overlay tl">● LIVE INPUT</span><span className="cam-overlay tr">{fps} FPS</span><span className="cam-overlay bl">{tracked?'21 LANDMARKS ACTIVE':'SHOW YOUR HAND'}</span></>}
               <i className="corner c1"/><i className="corner c2"/><i className="corner c3"/><i className="corner c4"/>
             </div>
-            <div className="panel-bottom"><span><span className={'dot '+(tracked?'green':'')}/> {cameraOn?(tracked?'Tracking hand':'Waiting for hand'):'No video input'}</span><button className="subtle-button" onClick={cameraOn?stop:start}>{cameraOn?'Stop Camera':'Connect Camera'}</button></div>
+            <div className="panel-bottom"><span><span className={'dot '+(tracked?'green':'')}/> {cameraOn?(tracked?`Detected: ${pose.gesture}`:status==='MODEL UNAVAILABLE'?'Camera on · model failed':'Show one hand clearly'):'No video input'}</span><button className="subtle-button" onClick={cameraOn?stop:start}>{cameraOn?'Stop Camera':'Connect Camera'}</button></div>
           </section>
           <section className="panel robot-panel"><div className="panel-head"><div className="panel-name"><span className="panel-icon aqua"><Cpu size={16}/></span><div><strong>Industrial Robot Simulation</strong><small>OUTPUT / 6-AXIS STYLE ARM + GRIPPER</small></div></div><span className="panel-tag live-tag"><span className="pulse"/> ROBOT 01</span></div>
             <div className="robot-view"><Robot pose={pose}/><div className="robot-watermark">HS-01 <span>/</span> ORANGE INDUSTRIAL ARM</div><div className="viewport-tip">DRAG TO ORBIT · SCROLL TO ZOOM</div><div className="axis-label"><span className="red">X</span><span className="green-text">Y</span><span className="blue">Z</span></div></div>
-            <div className="panel-bottom"><span><span className="dot green"/> Simulated joints responding</span><button className="icon-button" title="Reset pose" onClick={reset}><RotateCcw size={16}/></button></div>
+            <div className="panel-bottom"><span><span className={'dot '+(tracked?'green':'')}/> {mode==='LIVE'?`Gesture: ${pose.gesture} · grip ${Math.round((pose.grip||0)*100)}%`:'Manual demonstration mode'}</span><button className="icon-button" title="Reset pose" onClick={reset}><RotateCcw size={16}/></button></div>
           </section>
         </div>
         {error&&<div className="error-banner"><CircleHelp size={17}/><span>{error} You can still use demo gestures below.</span>{cameraOn&&<button onClick={()=>{stop();setTimeout(start,100)}}>Retry tracking</button>}<button onClick={()=>setError('')}>Dismiss</button></div>}
         <div className="bottom-grid">
           <section className="panel controls"><div className="section-head"><div><h2><SlidersHorizontal size={17}/> Motion Controls</h2><p>Test poses without your camera or customize tracking behavior.</p></div><span className="panel-tag">{mode} MODE</span></div>
-            <div className="control-label">QUICK GESTURES <span>DEMO MODE</span></div><div className="gestures">{Object.keys(presets).map(g=><button key={g} className={'gesture '+(mode==='DEMO'&&gesture===g?'selected':'')} onClick={()=>selectGesture(g)}><span className="gesture-emoji">{{open:'✋',fist:'✊',pinch:'🤏',point:'☝️',peace:'✌️'}[g]}</span>{g.toUpperCase()}</button>)}</div>
+            <div className="control-label">TEST GESTURES <span>{mode==='LIVE'?'LIVE CONTROL':'MANUAL CONTROL'}</span></div><div className="gestures">{Object.keys(presets).map(g=><button key={g} className={'gesture '+(mode==='DEMO'&&gesture===g?'selected':'')} onClick={()=>selectGesture(g)}><span className="gesture-emoji">{{open:'✋',fist:'✊',pinch:'🤏',point:'☝️',peace:'✌️'}[g]}</span>{g.toUpperCase()}</button>)}</div>
+            {cameraOn&&<button className="primary resume-button" onClick={resumeLive}><Camera size={16}/> Resume Live Hand Control</button>}
             <div className="slider-line"><div><strong>Motion smoothing</strong><span>Higher values reduce jitter but add lag.</span></div><span className="number">{smoothing}%</span></div><input type="range" min="0" max="95" value={smoothing} onChange={e=>setSmoothing(Number(e.target.value))}/>
             <div className="toggle-row"><label><input type="checkbox" checked={mirror} onChange={e=>setMirror(e.target.checked)}/> Mirror camera preview</label><label><input type="checkbox" checked={landmarks} onChange={e=>setLandmarks(e.target.checked)}/> Show landmarks</label></div>
           </section>
