@@ -1,0 +1,47 @@
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+const TASK_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm';
+export const NEUTRAL = { curls: [0.12, 0.1, 0.1, 0.1, 0.1], wristX: 0, wristY: 0, roll: 0, pitch: 0 };
+const clamp = (x, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, x));
+const distance = (a,b) => Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+const angle = (a,b,c) => {
+  const u = [a.x-b.x,a.y-b.y,a.z-b.z], v = [c.x-b.x,c.y-b.y,c.z-b.z];
+  const dot = u[0]*v[0]+u[1]*v[1]+u[2]*v[2];
+  const mag = Math.hypot(...u)*Math.hypot(...v);
+  return Math.acos(clamp(dot / (mag || 1), -1, 1));
+};
+export function calculatePose(lm) {
+  // Bend measured at MCP/PIP joints, not fingertip-screen distance alone.
+  const chains = [[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20]];
+  const curls = chains.map(([a,b,c,d], i) => {
+    const pipBend = 1 - angle(lm[a],lm[b],lm[c]) / Math.PI;
+    const dipBend = 1 - angle(lm[b],lm[c],lm[d]) / Math.PI;
+    const mcpBend = i === 0 ? 0 : 1 - angle(lm[0],lm[a],lm[b]) / Math.PI;
+    return clamp((pipBend * .55 + dipBend * .25 + mcpBend * .20 - .06) * 1.8);
+  });
+  const base = lm[0], index = lm[5], pinky = lm[17], middle = lm[9];
+  const across = {x:index.x-pinky.x,y:index.y-pinky.y};
+  const roll = clamp(Math.atan2(across.y,across.x) / 1.5, -1, 1);
+  const palmLength = distance(base,middle);
+  return {
+    curls, wristX: clamp((.5-base.x)*2,-1,1), wristY: clamp((.55-base.y)*2,-1,1),
+    roll, pitch: clamp((middle.z-base.z)/(palmLength || .1),-1,1)
+  };
+}
+export async function createTracker() {
+  const vision = await FilesetResolver.forVisionTasks(WASM_URL);
+  const options = {baseOptions:{modelAssetPath:TASK_URL,delegate:'GPU'},runningMode:'VIDEO',numHands:1,minHandDetectionConfidence:.6,minTrackingConfidence:.55};
+  try { return await HandLandmarker.createFromOptions(vision,options); }
+  catch { return HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:TASK_URL,delegate:'CPU'}}); }
+}
+export function drawLandmarks(canvas, landmarks, video) {
+  const ctx=canvas.getContext('2d');
+  canvas.width=video.videoWidth || 640; canvas.height=video.videoHeight || 480;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!landmarks) return;
+  const edges=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  ctx.strokeStyle='#5ef4cb';ctx.lineWidth=2.5;ctx.lineCap='round';
+  edges.forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(landmarks[a].x*canvas.width,landmarks[a].y*canvas.height);ctx.lineTo(landmarks[b].x*canvas.width,landmarks[b].y*canvas.height);ctx.stroke();});
+  landmarks.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x*canvas.width,p.y*canvas.height,i===0?5:3,0,Math.PI*2);ctx.fillStyle=i===0?'#fff':'#7dfde1';ctx.fill();});
+}
