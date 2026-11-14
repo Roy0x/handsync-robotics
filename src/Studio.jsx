@@ -77,9 +77,16 @@ export default function Studio(){
                   wristY:(prev.wristY||0)+(n.wristY-(prev.wristY||0))*alpha,
                   roll:(prev.roll||0)+(n.roll-(prev.roll||0))*alpha,
                   pitch:(prev.pitch||0)+(n.pitch-(prev.pitch||0))*alpha});
-                const mapped=sorted.map(lm=>({side:lm[0].x>=.5?'left':'right',pose:calculatePose(lm)}));
-                // If both appear on one side, reliably assign by on-screen order.
-                if(mapped.length===2){mapped[0].side='left';mapped[1].side='right';}
+                // Prefer model handedness for stable assignment when hands cross.
+                // MediaPipe handedness assumes mirrored inputs, while this webcam is unmirrored.
+                const mapped=hands.map((lm,i)=>({
+                  side:result.handedness?.[i]?.[0]?.categoryName==='Left'?'right':result.handedness?.[i]?.[0]?.categoryName==='Right'?'left':null,
+                  pose:calculatePose(lm),x:lm[0].x
+                }));
+                if(mapped.length===2&&(mapped[0].side===mapped[1].side||!mapped[0].side||!mapped[1].side)){
+                  mapped.sort((a,b)=>b.x-a.x);mapped[0].side='left';mapped[1].side='right';
+                }
+                if(mapped.length===1&&!mapped[0].side)mapped[0].side=mapped[0].x>=.5?'left':'right';
                 setBothPoses(prev=>{
                   const updated={...prev};
                   for(const item of mapped)updated[item.side]=blend(prev[item.side],item.pose);
