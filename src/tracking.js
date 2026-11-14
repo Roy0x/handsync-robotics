@@ -23,8 +23,9 @@ export function calculatePose(lm) {
     return [i===0?clamp((mcp+pip)*.45):mcp,pip,dip];
   });
   // Relative fingertip MCP spread in image space; approximate only under hand rotation.
-  const palmAxis=Math.atan2(lm[5].y-lm[17].y,lm[5].x-lm[17].x);
-  const spread=chains.map(([a,b])=>clamp(Math.atan2(lm[b].y-lm[a].y,lm[b].x-lm[a].x)-palmAxis,-1,1));
+  const palmAxis=Math.atan2(lm[9].y-lm[0].y,lm[9].x-lm[0].x);
+  const wrapAngle=x=>Math.atan2(Math.sin(x),Math.cos(x));
+  const spread=chains.map(([a,b],i)=>i===0?0:clamp(wrapAngle(Math.atan2(lm[b].y-lm[a].y,lm[b].x-lm[a].x)-palmAxis)/.75,-.8,.8));
   const curls = chains.map(([a,b,c,d], i) => {
     const pipBend = 1 - angle(lm[a],lm[b],lm[c]) / Math.PI;
     const dipBend = 1 - angle(lm[b],lm[c],lm[d]) / Math.PI;
@@ -63,10 +64,10 @@ export async function createTracker() {
       const type=check.headers.get('content-type')||'';
       if(!check.ok || type.includes('text/html'))throw new Error(`model URL returned HTTP ${check.status} (${type||'no content-type'})`);
       const vision=await FilesetResolver.forVisionTasks(source.wasm);
-      for(const delegate of ['CPU','GPU']){
+      for(const delegate of ['GPU','CPU']){
         try {
           return await HandLandmarker.createFromOptions(vision,{
-            baseOptions:{modelAssetPath:source.model,delegate},runningMode:'VIDEO',numHands:1,
+            baseOptions:{modelAssetPath:source.model,delegate},runningMode:'VIDEO',numHands:2,
             minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5
           });
         }catch(e){failures.push(`${source.label} (${delegate}): ${readable(e)}`);}
@@ -75,13 +76,20 @@ export async function createTracker() {
   }
   throw new Error(`Hand model initialization failed. ${failures.join(' | ').slice(0,900)}`);
 }
+// Draw without resizing the canvas on every camera frame (resizing resets graphics state).
 export function drawLandmarks(canvas, landmarks, video) {
+  if(!canvas||!video)return;
+  const width=video.videoWidth||640,height=video.videoHeight||480;
+  if(canvas.width!==width)canvas.width=width;
+  if(canvas.height!==height)canvas.height=height;
   const ctx=canvas.getContext('2d');
-  canvas.width=video.videoWidth || 640; canvas.height=video.videoHeight || 480;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(!landmarks) return;
+  ctx.clearRect(0,0,width,height);
+  const hands=Array.isArray(landmarks?.[0])?landmarks:(landmarks?[landmarks]:[]);
   const edges=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-  ctx.strokeStyle='#5ef4cb';ctx.lineWidth=2.5;ctx.lineCap='round';
-  edges.forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(landmarks[a].x*canvas.width,landmarks[a].y*canvas.height);ctx.lineTo(landmarks[b].x*canvas.width,landmarks[b].y*canvas.height);ctx.stroke();});
-  landmarks.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x*canvas.width,p.y*canvas.height,i===0?5:3,0,Math.PI*2);ctx.fillStyle=i===0?'#fff':'#7dfde1';ctx.fill();});
+  hands.forEach((hand,index)=>{
+    ctx.strokeStyle=index===0?'#6ff4c6':'#f6a2ce';ctx.lineWidth=2.5;ctx.lineCap='round';
+    for(const [a,b] of edges){ctx.beginPath();ctx.moveTo(hand[a].x*width,hand[a].y*height);ctx.lineTo(hand[b].x*width,hand[b].y*height);ctx.stroke();}
+    ctx.fillStyle=index===0?'#beffe6':'#ffc4e3';
+    for(const p of hand){ctx.beginPath();ctx.arc(p.x*width,p.y*height,3,0,Math.PI*2);ctx.fill();}
+  });
 }
