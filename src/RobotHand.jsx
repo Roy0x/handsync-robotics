@@ -91,6 +91,8 @@ function HandModel({pose}){
   if(!root.current)return;
   root.current.rotation.z=damp(root.current.rotation.z,(pose.roll||0)*.55,dt);
   root.current.rotation.x=damp(root.current.rotation.x,-(pose.pitch||0)*.45,dt);
+  root.current.position.x=damp(root.current.position.x,(pose.wristX||0)*.12,dt);
+  root.current.position.y=damp(root.current.position.y,.28+(pose.wristY||0)*.12,dt);
  });
  const joints=pose.joints?.length===5?pose.joints:Array.from({length:5},(_,i)=>[pose.curls?.[i]||0,pose.curls?.[i]||0,pose.curls?.[i]||0]);
  const spread=pose.spread||[0,0,0,0,0];
@@ -103,15 +105,17 @@ function HandModel({pose}){
   <Digit origin={[.49,1.15,0]} lengths={[.40,.30,.21]} width={.20} bend={joints[4]} splay={spread[4]} rest={-.15}/>
  </group>;
 }
-export default function RobotHand({pose,scene='dark'}){
+export default function RobotHand({pose,scene='dark',leftPose,rightPose}){
  const light=scene==='light';
- return <Canvas camera={{position:[2.45,1.1,6.6],fov:37}} dpr={[1,1.35]} gl={{antialias:true,powerPreference:'low-power'}} shadows>
-  <color attach="background" args={[light?'#d9cbd0':'#682739']}/>
+ const left=leftPose||pose,right=rightPose||pose;
+ return <Canvas camera={{position:[1.15,1.25,9.2],fov:39}} dpr={[1,1.15]} gl={{antialias:true,powerPreference:'low-power'}} shadows>
+  <color attach="background" args={[light?'#ded6da':'#682739']}/>
   <ambientLight intensity={light?2.25:1.45}/>
-  <directionalLight position={[-3,7,6]} intensity={3.1} castShadow shadow-mapSize={[512,512]}/>
-  <pointLight position={[4,0,-3]} color="#f7a3b8" intensity={light?3:9}/>
-  <pointLight position={[-4,2,2]} color="#ffffff" intensity={3}/>
-  <HandModel pose={pose}/>
-  <OrbitControls target={[0,.2,0]} minDistance={3.3} maxDistance={10} enablePan={false}/>
+  <directionalLight position={[-3,7,6]} intensity={2.7} castShadow shadow-mapSize={[512,512]}/>
+  <pointLight position={[4,0,-3]} color="#f7a3b8" intensity={light?3:6}/>
+  <pointLight position={[-4,2,2]} color="#ffffff" intensity={2.5}/>
+  <group position={[-1.45,0,0]} scale={[-.80,.80,.80]}><HandModel pose={left}/></group>
+  <group position={[1.45,0,0]} scale={[.80,.80,.80]}><HandModel pose={right}/></group>
+  <OrbitControls target={[0,.25,0]} minDistance={6.2} maxDistance={13} enablePan={false}/>
  </Canvas>;
 }
